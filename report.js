@@ -1,209 +1,320 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
-  Card,
-  Select,
-  DatePicker,
-  Button,
+  Tabs,
   Form,
-  Table,
+  DatePicker,
+  Select,
+  Button,
+  Row,
+  Col,
+  Card,
+  Statistic,
+  Progress,
+  Dropdown,
+  Menu,
+  Tooltip,
+  Space,
   message,
-  Spin,
-} from 'antd';
-import { DownloadOutlined, EyeOutlined } from '@ant-design/icons';
-import dayjs from 'dayjs';
-import * as XLSX from 'xlsx';
-import axios from 'axios';
+  Tag,
+  Typography,
+  Divider,
+} from "antd";
+import {
+  DownloadOutlined,
+  FileExcelOutlined,
+  FileZipOutlined,
+  ReloadOutlined,
+  ExclamationCircleOutlined,
+  FileSearchOutlined,
+} from "@ant-design/icons";
 
+const { TabPane } = Tabs;
+const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
-const { Option } = Select;
 
-const ReportingTab = () => {
-  const [reportType, setReportType] = useState('tradeBreak');
-  const [form] = Form.useForm();
-  const [previewData, setPreviewData] = useState([]);
-  const [columns, setColumns] = useState([]);
+const dummySummary = {
+  totalBreaks: 1223,
+  agedBreaks: 187,
+  comments: 320,
+  open: 820,
+  closed: 403,
+};
+
+const ReportingDashboard = () => {
+  const [form1] = Form.useForm();
+  const [form2] = Form.useForm();
+  const [form3] = Form.useForm();
   const [loading, setLoading] = useState(false);
-
-  const handleGenerate = async () => {
-    try {
-      const values = await form.validateFields();
-      setLoading(true);
-      let response;
-
-      // Example API logic per report type
-      if (reportType === 'tradeBreak') {
-        response = await axios.post('/api/reports/tradeBreak', {
-          dateRange: values.dateRange?.map((d) => d.format('YYYY-MM-DD')),
-          breakCategory: values.breakCategory,
-          sourceType: values.sourceType,
-        });
-
-        setColumns([
-          {
-            title: 'BREAK CATEGORY',
-            dataIndex: 'category',
-            key: 'category',
-            render: (text) => <strong>{text}</strong>,
-          },
-          {
-            title: 'SOURCE SYSTEM',
-            dataIndex: 'source',
-            key: 'source',
-          },
-          {
-            title: 'AMOUNT (INR)',
-            dataIndex: 'amount',
-            key: 'amount',
-            align: 'right',
-            render: (value) => `₹${value.toLocaleString()}`,
-          },
-        ]);
-      } else if (reportType === 'zipReport') {
-        response = await axios.post('/api/reports/zipReport', {
-          tradeDate: values.tradeDate.format('YYYY-MM-DD'),
-        });
-
-        setColumns([
-          {
-            title: 'FILE NAME',
-            dataIndex: 'fileName',
-            key: 'fileName',
-          },
-          {
-            title: 'STATUS',
-            dataIndex: 'status',
-            key: 'status',
-          },
-        ]);
-      } else if (reportType === 'comparison') {
-        response = await axios.post('/api/reports/comparison', {
-          date1: values.date1.format('YYYY-MM-DD'),
-          date2: values.date2.format('YYYY-MM-DD'),
-        });
-
-        setColumns([
-          {
-            title: 'INSTRUMENT',
-            dataIndex: 'instrument',
-            key: 'instrument',
-          },
-          {
-            title: `POSITION (${values.date1.format('DD-MM-YYYY')})`,
-            dataIndex: 'position1',
-            key: 'position1',
-            align: 'right',
-          },
-          {
-            title: `POSITION (${values.date2.format('DD-MM-YYYY')})`,
-            dataIndex: 'position2',
-            key: 'position2',
-            align: 'right',
-          },
-          {
-            title: 'DIFFERENCE',
-            dataIndex: 'difference',
-            key: 'difference',
-            align: 'right',
-          },
-        ]);
-      }
-
-      setPreviewData(response.data);
-    } catch (err) {
-      message.error('Failed to generate report.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [range, setRange] = useState([]);
 
   const handleDownload = (type) => {
-    const ws = XLSX.utils.json_to_sheet(previewData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Report');
-    XLSX.writeFile(wb, `report.${type}`);
-    message.success(`Downloaded as ${type.toUpperCase()}`);
+    message.success(`${type} downloaded.`);
   };
 
-  const renderFilters = () => {
-    switch (reportType) {
-      case 'tradeBreak':
-        return (
-          <>
-            <Form.Item name="dateRange" rules={[{ required: true }]}> <RangePicker /></Form.Item>
-            <Form.Item name="breakCategory" rules={[{ required: true }]}> <Select placeholder="Break Category" style={{ width: 150 }}>
-              <Option value="Mismatch">Mismatch</Option>
-              <Option value="Delay">Delay</Option>
-            </Select></Form.Item>
-            <Form.Item name="sourceType" rules={[{ required: true }]}> <Select placeholder="Source Type" style={{ width: 150 }}>
-              <Option value="System A">System A</Option>
-              <Option value="System B">System B</Option>
-            </Select></Form.Item>
-          </>
-        );
-      case 'zipReport':
-        return (
-          <Form.Item name="tradeDate" rules={[{ required: true }]}> <DatePicker /></Form.Item>
-        );
-      case 'comparison':
-        return (
-          <>
-            <Form.Item name="date1" rules={[{ required: true }]}> <DatePicker placeholder="Date 1" /></Form.Item>
-            <Form.Item name="date2" rules={[{ required: true }]}> <DatePicker placeholder="Date 2" /></Form.Item>
-          </>
-        );
-      default:
-        return null;
-    }
+  const handleTradeReportGenerate = (values) => {
+    const payload = {
+      businessDate: values.date.format("YYYY-MM-DD"),
+      filterOptions: {
+        status: values.status || [],
+        breakCategory: values.breakCategory || [],
+        sourceNames: values.sourceNames || [],
+      },
+    };
+    console.log("🚀 Generated Trade Report Payload:", payload);
+    message.success("Trade Report filter payload generated.");
+  };
+
+  const handleZipGenerate = () => {
+    setLoading(true);
+    setTimeout(() => {
+      message.success(`EOD ZIP Report generated successfully!`);
+      setLoading(false);
+    }, 1000);
+  };
+
+  const handleComparisonGenerate = () => {
+    setLoading(true);
+    setTimeout(() => {
+      message.success(`Comparison Report generated successfully!`);
+      setLoading(false);
+    }, 1000);
   };
 
   return (
-    <Card title="Reporting Solution" style={{ margin: 20 }}>
-      <Form layout="inline" form={form}>
-        <Form.Item label="Report Type">
-          <Select value={reportType} onChange={setReportType} style={{ width: 220 }}>
-            <Option value="tradeBreak">Trade Break Report</Option>
-            <Option value="zipReport">End-of-Day ZIP Report</Option>
-            <Option value="comparison">Comparison Report</Option>
-          </Select>
-        </Form.Item>
+    <div style={{ padding: 24, background: "#fff", borderRadius: 12 }}>
+      <Space direction="vertical" size="small" style={{ width: "100%" }}>
+        <Title level={3}>Reporting Dashboard</Title>
+        <Text type="secondary">
+          Generate and download operational reports quickly.
+        </Text>
+      </Space>
 
-        {renderFilters()}
+      <Divider style={{ marginTop: 16, marginBottom: 24 }} />
 
-        <Form.Item>
-          <Button type="primary" onClick={handleGenerate} icon={<EyeOutlined />}>Generate & Preview</Button>
-        </Form.Item>
-      </Form>
-
-      {loading ? (
-        <Spin size="large" style={{ marginTop: 40 }} />
-      ) : (
-        previewData.length > 0 && (
-          <Card
-            title="Preview Results"
-            style={{ marginTop: 20 }}
-            extra={
-              <>
-                <Button onClick={() => handleDownload('csv')} icon={<DownloadOutlined />} style={{ marginRight: 10 }}>
-                  Download CSV
-                </Button>
-                <Button onClick={() => handleDownload('xlsx')} icon={<DownloadOutlined />}>
-                  Download Excel
-                </Button>
-              </>
-            }
-          >
-            <Table
-              columns={columns}
-              dataSource={previewData}
-              pagination={{ pageSize: 5 }}
-              bordered
-              rowKey={(row, i) => i}
+      {/* Summary KPIs */}
+      <Row gutter={16}>
+        <Col span={6}>
+          <Card hoverable>
+            <Statistic
+              title="Today's Breaks"
+              value={dummySummary.totalBreaks}
+              prefix={
+                <ExclamationCircleOutlined style={{ color: "#fa8c16" }} />
+              }
             />
           </Card>
-        )
-      )}
-    </Card>
+        </Col>
+        <Col span={6}>
+          <Card hoverable>
+            <Statistic
+              title="Aged Breaks (>5d)"
+              value={dummySummary.agedBreaks}
+              suffix={<Tag color="red">High</Tag>}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card hoverable>
+            <Statistic
+              title="Open Status (Not Closed)"
+              value={dummySummary.open}
+              suffix={<Tag color="orange">Pending</Tag>}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card hoverable>
+            <Statistic
+              title="Resolved"
+              value={`${Math.round(
+                (dummySummary.closed /
+                  (dummySummary.open + dummySummary.closed)) *
+                  100
+              )}%`}
+            />
+            <Progress
+              percent={Math.round(
+                (dummySummary.closed /
+                  (dummySummary.open + dummySummary.closed)) *
+                  100
+              )}
+              size="small"
+              strokeColor="#52c41a"
+              showInfo={false}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      <Divider style={{ marginTop: 24, marginBottom: 16 }} />
+
+      {/* Tabs */}
+      <Tabs defaultActiveKey="1" type="card" destroyInactiveTabPane>
+        {/* Trade Report */}
+        <TabPane key="1" tab="🔎 Breaks Report">
+          <Card hoverable>
+            <Form
+              form={form1}
+              layout="vertical"
+              onFinish={handleTradeReportGenerate}
+            >
+              <Row gutter={16}>
+                <Col span={6}>
+                  <Form.Item
+                    label="Business Date"
+                    name="date"
+                    rules={[
+                      { required: true, message: "Please select a date" },
+                    ]}
+                  >
+                    <RangePicker
+                      style={{ width: "100%" }}
+                      value={range}
+                      onChange={(dates) => setRange(dates || [])}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item label="Status" name="status">
+                    <Select
+                      mode="multiple"
+                      placeholder="Select status"
+                      allowClear
+                      options={[
+                        { value: "open", label: "Open" },
+                        { value: "closed", label: "Closed" },
+                      ]}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item label="Break Category" name="breakCategory">
+                    <Select
+                      mode="multiple"
+                      placeholder="Select category"
+                      allowClear
+                      options={[
+                        { value: "settlement", label: "Settlement" },
+                        { value: "valuation", label: "Valuation" },
+                        { value: "missing", label: "Missing Trade" },
+                      ]}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item label="Source Names" name="sourceNames">
+                    <Select
+                      mode="multiple"
+                      placeholder="Select sources"
+                      allowClear
+                      options={[
+                        { value: "oms", label: "OMS" },
+                        { value: "custodian", label: "Custodian" },
+                        { value: "internal", label: "Internal Ledger" },
+                      ]}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              {/* Action Buttons */}
+              <Row justify="end" style={{ marginTop: 16 }}>
+                <Space>
+                  <Dropdown
+                    placement="bottomRight"
+                    menu={{
+                      items: [
+                        {
+                          key: "excel",
+                          icon: <FileExcelOutlined />,
+                          label: "Download Excel",
+                          onClick: () => handleDownload("Excel File"),
+                        },
+                        {
+                          key: "csv",
+                          icon: <DownloadOutlined />,
+                          label: "Download CSV",
+                          onClick: () => handleDownload("CSV File"),
+                        },
+                      ],
+                    }}
+                  >
+                    <Button icon={<DownloadOutlined />}>Download</Button>
+                  </Dropdown>
+                </Space>
+              </Row>
+            </Form>
+          </Card>
+        </TabPane>
+
+        {/* ZIP Report */}
+        <TabPane tab="📦 EOD ZIP Report" key="2">
+          <Card hoverable>
+            <Form form={form2} layout="inline" onFinish={handleZipGenerate}>
+              <Form.Item
+                label="COB Date"
+                name="date"
+                rules={[{ required: true, message: "Select a date" }]}
+              >
+                <DatePicker />
+              </Form.Item>
+              <Form.Item>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  icon={<FileZipOutlined />}
+                  loading={loading}
+                >
+                  Download ZIP
+                </Button>
+              </Form.Item>
+            </Form>
+            <Divider />
+            <Text type="secondary">
+              ZIP will contain multiple files (summary, breaks, etc.) for the
+              selected trade date.
+            </Text>
+          </Card>
+        </TabPane>
+
+        {/* Comparison Report */}
+        <TabPane tab="🆚 Comparison Report" key="3">
+          <Card hoverable>
+            <Form
+              form={form3}
+              layout="inline"
+              onFinish={handleComparisonGenerate}
+            >
+              <Form.Item
+                label="Date 1"
+                name="date1"
+                rules={[{ required: true, message: "Select Date 1" }]}
+              >
+                <DatePicker />
+              </Form.Item>
+              <Form.Item
+                label="Date 2"
+                name="date2"
+                rules={[{ required: true, message: "Select Date 2" }]}
+              >
+                <DatePicker />
+              </Form.Item>
+              <Form.Item>
+                <Space>
+                  <Button
+                    icon={<DownloadOutlined />}
+                    onClick={() => handleDownload("Comparison Excel")}
+                  >
+                    Download
+                  </Button>
+                </Space>
+              </Form.Item>
+            </Form>
+          </Card>
+        </TabPane>
+      </Tabs>
+    </div>
   );
 };
 
-export default ReportingTab;
+export default ReportingDashboard;
